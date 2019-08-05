@@ -106,13 +106,29 @@ pingme remove [ID]              - Deletes a rule with the given ID (found in the
             except:
                 await message.channel.send(cmd[6:] + " is not a number")
         elif cmd.lower().startswith("add "):
-            self.db_new_ping(message.guild.id, 0, message.author.id, "/" + cmd[4:] + "/i")
+            await self.new_ping(message, "/" + cmd[4:] + "/i")
         elif cmd.lower().startswith("addhere "):
-            self.db_new_ping(message.guild.id, message.channel.id, message.author.id, "/" + cmd[8:] + "/i")
+            await self.new_ping(message, "/" + cmd[8:] + "/i", True)
         elif cmd.lower().startswith("regex "):
-            self.db_new_ping(message.guild.id, 0, message.author.id, cmd[6:])
+            await self.new_ping(message, cmd[6:])
         elif cmd.lower().startswith("regexhere "):
-            self.db_new_ping(message.guild.id, message.channel.id, message.author.id, cmd[10:])
+            await self.new_ping(message, cmd[10:], True)
+
+    async def new_ping(self, message, regex, channel_specific=False):
+        count = self.db.execute("SELECT COUNT(*) FROM pings WHERE guild=? AND user=?",
+                                (message.guild.id, message.author.id)).fetchone()[0]
+        if count >= user_pings_per_server:
+            await message.channel.send(
+                "Limit of " + str(user_pings_per_server) + " ping rules reached. Delete a rule to make room.")
+        else:
+            channel = 0
+            channel_name = "All"
+            if channel_specific:
+                channel = message.channel.id
+                channel_name = message.channel.name
+            self.db_new_ping(message.guild.id, channel, message.author.id, regex)
+            await message.channel.send(
+                "New rule added in `" + message.guild.name + "`/`" + channel_name + "` - Rule: `" + regex + "`")
 
     def db_new_ping(self, guild, channel, user, regex):
         self.id_index += 1
